@@ -1985,7 +1985,7 @@ static void tegra_dc_underflow_handler(struct tegra_dc *dc)
 			dc->windows[i].underflows++;
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
-			if (dc->windows[i].underflows > 4)
+			if (dc->windows[i].underflows > 6)
 				schedule_work(&dc->reset_work);
 #endif
 		} else {

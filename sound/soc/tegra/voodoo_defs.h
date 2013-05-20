@@ -1,0 +1,2 @@
+#define DEVICEID A500
+#define VOODOO_SOUND_VERSION 1

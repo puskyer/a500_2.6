@@ -32,6 +32,8 @@
 
 #include <trace/events/power.h>
 
+#include <asm/cpu.h>
+
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
 						"cpufreq-core", msg)
 
@@ -286,10 +288,9 @@ static inline void cpufreq_debug_disable_ratelimit(void) { return; }
  * systems as each CPU might be scaled differently. So, use the arch
  * per-CPU loops_per_jiffy value wherever possible.
  */
-#ifndef CONFIG_SMP
 static unsigned long l_p_j_ref;
 static unsigned int  l_p_j_ref_freq;
-
+ #ifndef CONFIG_SMP
 static void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 {
 	if (ci->flags & CPUFREQ_CONST_LOOPS)
@@ -311,9 +312,48 @@ static void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 	}
 }
 #else
-static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
+/* Tegra 2 (like OMAP), has a single frequency and voltage plane, so this should be safe */
+struct lpj_info {
+	unsigned long	ref;
+	unsigned int	freq;
+};
+static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
+
+static void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 {
-	return;
+	struct cpufreq_policy *policy;
+	unsigned int i;
+
+	if (ci->flags & CPUFREQ_CONST_LOOPS)
+		return;
+
+	if (!l_p_j_ref_freq) {
+		l_p_j_ref = loops_per_jiffy;
+		l_p_j_ref_freq = ci->old;
+		dprintk("saving %lu as reference value for loops_per_jiffy; "
+			"freq is %u kHz\n", l_p_j_ref, l_p_j_ref_freq);
+	}
+
+	if ((val == CPUFREQ_PRECHANGE  && ci->old < ci->new) ||
+	    (val == CPUFREQ_POSTCHANGE && ci->old > ci->new) ||
+	    (val == CPUFREQ_RESUMECHANGE || val == CPUFREQ_SUSPENDCHANGE)) {
+		policy = per_cpu(cpufreq_cpu_data, ci->cpu);
+
+		for_each_cpu(i, policy->cpus) {
+			struct lpj_info *lpj = &per_cpu(lpj_ref, i);
+			if (!lpj->freq) {
+				lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
+				lpj->freq = ci->old;
+			}
+			per_cpu(cpu_data, i).loops_per_jiffy =
+				cpufreq_scale(lpj->ref, lpj->freq, ci->new);
+		}
+
+		loops_per_jiffy = cpufreq_scale(l_p_j_ref, l_p_j_ref_freq,
+								ci->new);
+		dprintk("scaling loops_per_jiffy to %lu "
+			"for frequency %u kHz\n", loops_per_jiffy, ci->new);
+	}
 }
 #endif
 
@@ -537,6 +577,9 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	unsigned int ret = -EINVAL;
 	char	str_governor[16];
 	struct cpufreq_policy new_policy;
+	char *envp[3];
+	char buf1[64];
+	char buf2[64];
 
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
@@ -556,6 +599,13 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 
 	policy->user_policy.policy = policy->policy;
 	policy->user_policy.governor = policy->governor;
+
+	snprintf(buf1, sizeof(buf1), "GOV=%s", policy->governor->name);
+	snprintf(buf2, sizeof(buf2), "CPU=%u", policy->cpu);
+	envp[0] = buf1;
+	envp[1] = buf2;
+	envp[2] = NULL;
+	kobject_uevent_env(cpufreq_global_kobject, KOBJ_ADD, envp);
 
 	if (ret)
 		return ret;
@@ -674,7 +724,7 @@ static ssize_t show_bios_limit(struct cpufreq_policy *policy, char *buf)
 static ssize_t show_frequency_voltage_table(struct cpufreq_policy *policy, char *buf)
 {
 	char *table = buf;
-	int i, start = 0, end = FREQCOUNT - 1, step = 1;
+	int i, start = 0, step = 1;
 
 	for (i = 0; i < FREQCOUNT; i++)
 		table += sprintf(table, "%d %d %d\n", cpufrequency[start+(i*step)], cpuvoltage[start+(i*step)], (cpuvoltage[start+(i*step)]-cpuuvoffset[start+(i*step)]));
@@ -698,18 +748,18 @@ static ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf)
 
 static ssize_t show_cpuinfo_max_mV(struct cpufreq_policy *policy, char *buf)
 {
-	sprintf(buf, "%u\n", CPUMVMAX);
+	return sprintf(buf, "%u\n", CPUMVMAX);
 }
 
 static ssize_t show_cpuinfo_min_mV(struct cpufreq_policy *policy, char *buf)
 {
-	sprintf(buf, "%u\n", CPUMVMIN);
+	return sprintf(buf, "%u\n", CPUMVMIN);
 }
 
 static ssize_t store_UV_mV_table(struct cpufreq_policy *policy, char *buf, size_t count)
 {
 	int tmptable[FREQCOUNT];
-	int i, start = 0, end = FREQCOUNT - 1, step = 1;
+	int i, start = 0, step = 1;
 
 	unsigned int ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d %d %d %d %d", &tmptable[0], &tmptable[1], &tmptable[2], &tmptable[3], &tmptable[4], &tmptable[5], &tmptable[6], &tmptable[7], &tmptable[8], &tmptable[9], &tmptable[10], &tmptable[11], &tmptable[12]);
 	if (ret != FREQCOUNT)
@@ -1107,6 +1157,16 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 		dprintk("initialization failed\n");
 		goto err_unlock_policy;
 	}
+#ifdef CONFIG_HOTPLUG_CPU
+	for_each_online_cpu(sibling) {
+		struct cpufreq_policy *cp = per_cpu(cpufreq_cpu_data, sibling);
+		if (cp && cp->governor && (cpumask_test_cpu(cpu, cp->related_cpus))) {
+			policy->min = cp->min;
+			policy->max = cp->max;
+			break;
+		}
+	}
+#endif
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
 
@@ -2075,4 +2135,3 @@ static int __init cpufreq_core_init(void)
 	return 0;
 }
 core_initcall(cpufreq_core_init);
-

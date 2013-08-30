@@ -763,9 +763,6 @@ struct ieee80211_local {
 	/* device is started */
 	bool started;
 
-        /* wowlan is enabled -- don't reconfig on resume */
-        bool wowlan;
-
 	int tx_headroom; /* required headroom for hardware/radiotap */
 
 	/* Tasklet and skb queue to process calls from IRQ mode. All frames
@@ -1249,8 +1246,7 @@ int ieee80211_reconfig(struct ieee80211_local *local);
 void ieee80211_stop_device(struct ieee80211_local *local);
 
 #ifdef CONFIG_PM
-int __ieee80211_suspend(struct ieee80211_hw *hw,
-      struct cfg80211_wowlan *wowlan);
+int __ieee80211_suspend(struct ieee80211_hw *hw);
 
 static inline int __ieee80211_resume(struct ieee80211_hw *hw)
 {
@@ -1263,8 +1259,7 @@ static inline int __ieee80211_resume(struct ieee80211_hw *hw)
 	return ieee80211_reconfig(hw_to_local(hw));
 }
 #else
-static inline int __ieee80211_suspend(struct ieee80211_hw *hw,
-              struct cfg80211_wowlan *wowlan)
+static inline int __ieee80211_suspend(struct ieee80211_hw *hw)
 {
 	return 0;
 }

@@ -701,13 +701,6 @@ int ieee80211_register_hw(struct ieee80211_hw *hw)
 		WLAN_CIPHER_SUITE_AES_CMAC
 	};
 
-        if ((hw->wiphy->wowlan.flags || hw->wiphy->wowlan.n_patterns)
-#ifdef CONFIG_PM
-           && (!local->ops->suspend || !local->ops->resume)
-#endif
-      )
-          return -EINVAL;
-
 	if (hw->max_report_rates == 0)
 		hw->max_report_rates = hw->max_rates;
 

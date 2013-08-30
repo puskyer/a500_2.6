@@ -69,8 +69,6 @@ struct cfg80211_registered_device {
 
 	struct work_struct conn_work;
 	struct work_struct event_work;
- 
-        struct cfg80211_wowlan *wowlan;
 
 	/* must be last because of the way we do wiphy_priv(),
 	 * and it should at least be aligned to NETDEV_ALIGN */
@@ -91,18 +89,6 @@ bool wiphy_idx_valid(int wiphy_idx)
 	return wiphy_idx >= 0;
 }
 
-static inline void
-cfg80211_rdev_free_wowlan(struct cfg80211_registered_device *rdev)
-{
-  int i;
-
-  if (!rdev->wowlan)
-    return;
-  for (i = 0; i < rdev->wowlan->n_patterns; i++)
-    kfree(rdev->wowlan->patterns[i].mask);
-  kfree(rdev->wowlan->patterns);
-  kfree(rdev->wowlan);
-}
 
 extern struct workqueue_struct *cfg80211_wq;
 extern struct mutex cfg80211_mutex;

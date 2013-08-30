@@ -32,6 +32,20 @@ config BCMDHD_WEXT
 	help
 	  Enables WEXT support
 
+config DHD_USE_STATIC_BUF
+	bool "Enable memory preallocation"
+	depends on BCMDHD
+	default n
+	---help---
+	  Use memory preallocated in platform
+
+config DHD_USE_SCHED_SCAN
+	bool "Use CFG80211 sched scan"
+	depends on BCMDHD && CFG80211
+	default n
+	---help---
+	  Use CFG80211 sched scan
+
 config BCMDHD_WIFI_CONTROL_FUNC
 	bool "Use bcmdhd_wlan device"
 	depends on BCMDHD
@@ -47,7 +61,7 @@ config BCMDHD_HW_OOB
 	---help---
 	  Use out of band interrupt for card interrupt and wake on wireless.
 
-config BCMDHD_ENABLE_P2P
+config DHD_ENABLE_P2P
 	bool "Enable Wifi Direct"
 	depends on BCMDHD && CFG80211
 	default n

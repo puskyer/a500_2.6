@@ -28,13 +28,14 @@
 struct common_audit_data {
 	char type;
 #define LSM_AUDIT_DATA_FS	1
-#define LSM_AUDIT_DATA_NET	2
-#define LSM_AUDIT_DATA_CAP	3
-#define LSM_AUDIT_DATA_IPC	4
-#define LSM_AUDIT_DATA_TASK	5
-#define LSM_AUDIT_DATA_KEY	6
-#define LSM_AUDIT_DATA_NONE	7
-#define LSM_AUDIT_DATA_KMOD	8
+#define LSM_AUDIT_DATA_PATH	2
+#define LSM_AUDIT_DATA_NET	3
+#define LSM_AUDIT_DATA_CAP	4
+#define LSM_AUDIT_DATA_IPC	5
+#define LSM_AUDIT_DATA_TASK	6
+#define LSM_AUDIT_DATA_KEY	7
+#define LSM_AUDIT_DATA_NONE	8
+#define LSM_AUDIT_DATA_KMOD	9
 	struct task_struct *tsk;
 	union 	{
 		struct {

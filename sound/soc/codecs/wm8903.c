@@ -2034,6 +2034,15 @@ static int wm8903_probe(struct snd_soc_codec *codec)
 
 		snd_soc_update_bits(codec, WM8903_INTERRUPT_CONTROL,
 				    WM8903_IRQ_POL, irq_pol);
+
+		/*
+		 * Ensure mic detection interrupts are masked until after
+		 * wm8903_mic_detect() is called, so that wm8903_irq() has
+		 * a valid wm8903->mic_jack() to report on.
+		 */
+		snd_soc_update_bits(codec, WM8903_INTERRUPT_STATUS_1_MASK,
+				    WM8903_MICDET_EINT | WM8903_MICSHRT_EINT,
+				    WM8903_MICDET_EINT | WM8903_MICSHRT_EINT);
 		
 		ret = request_threaded_irq(wm8903->irq, NULL, wm8903_irq,
 					   trigger | IRQF_ONESHOT,

@@ -430,7 +430,7 @@ static int adb_open(struct inode *ip, struct file *fp)
 	}
 
 	if (count < 5)
-		printk(KERN_INFO "adb_open(%s)\n", current->comm);
+		pr_info("adb_open\n");
 
 
 	fp->private_data = _adb_dev;

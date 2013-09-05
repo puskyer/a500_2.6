@@ -1170,7 +1170,7 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 			remove_wait_queue(&audit_backlog_wait, &wait);
 			continue;
 		}
-		if (audit_rate_check()
+		if (audit_rate_check)
 			printk(KERN_WARNING
 			       "audit: audit_backlog=%d > "
 			       "audit_backlog_limit=%d\n",
